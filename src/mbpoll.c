@@ -266,6 +266,8 @@ typedef struct xMbPollContext {
 
 /* private variables ======================================================== */
 
+static volatile sig_atomic_t g_bExitSignal = 0;
+
 static xMbPollContext ctx = {
   // Parameters
   .eMode = DEFAULT_MODE,
@@ -367,6 +369,7 @@ const char * sEnumToStr (int iElmt, const int * iList,
                          const char ** psStrList, int iSize);
 const char * sFunctionToStr (eFunctions eFunction);
 const char * sModeToStr (eModes eMode);
+void vCleanup (void);
 void vSigIntHandler (int sig);
 float fSwapFloat (float f);
 int32_t lSwapLong (int32_t l);
@@ -932,6 +935,9 @@ main (int argc, char **argv) {
 
     // Start of polling loop
     do {
+      if (g_bExitSignal) {
+        break;
+      }
 
       if (ctx.bIsWrite) {
 
@@ -985,9 +991,11 @@ main (int argc, char **argv) {
           printf ("Written %d references.\n", ctx.iCount);
         }
         else {
-          ctx.iErrorCount++;
-          fprintf (stderr, "Write %s failed: %s\n",
-                   sFunctionToStr (ctx.eFunction), modbus_strerror (errno));
+          if (!g_bExitSignal) {
+            ctx.iErrorCount++;
+            fprintf (stderr, "Write %s failed: %s\n",
+                     sFunctionToStr (ctx.eFunction), modbus_strerror (errno));
+          }
         }
         // End write --------------------------------------------------------
       }
@@ -996,6 +1004,9 @@ main (int argc, char **argv) {
 
         // Read -------------------------------------------------------------
         for (i = 0; i < ctx.iSlaveCount; i++) {
+          if (g_bExitSignal) {
+            break;
+          }
 
           iRet = modbus_set_slave (ctx.xBus, ctx.piSlaveAddr[i]);
           if (iRet != 0) {
@@ -1016,6 +1027,10 @@ main (int argc, char **argv) {
 
           int j;
           for (j = 0; j < ctx.iStartCount; j++) {
+            if (g_bExitSignal) {
+              break;
+            }
+
             // libmodbus utilise les adresses PDU !
             iStartReg = ctx.piStartRef[j] - ctx.iPduOffset;
 
@@ -1050,13 +1065,15 @@ main (int argc, char **argv) {
               vPrintReadValues (ctx.piStartRef[j], ctx.iCount, &ctx);
             }
             else {
-              ctx.iErrorCount++;
-              fprintf (stderr, "Read %s failed: %s\n",
-                       sFunctionToStr (ctx.eFunction),
-                       modbus_strerror (errno));
+              if (!g_bExitSignal) {
+                ctx.iErrorCount++;
+                fprintf (stderr, "Read %s failed: %s\n",
+                         sFunctionToStr (ctx.eFunction),
+                         modbus_strerror (errno));
+              }
             }
           }
-          if (ctx.bIsPolling) {
+          if (ctx.bIsPolling && !g_bExitSignal) {
 
             mb_delay (ctx.iPollRate);
           }
@@ -1064,11 +1081,11 @@ main (int argc, char **argv) {
         // End read ---------------------------------------------------------
       }
     }
-    while (ctx.bIsPolling);
+    while (ctx.bIsPolling && !g_bExitSignal);
   }
 
-  vSigIntHandler (SIGTERM);
-  return 0;
+  vCleanup ();
+  return (ctx.iErrorCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 
@@ -1341,7 +1358,7 @@ vAllocate (xMbPollContext * ctx) {
 
 // -----------------------------------------------------------------------------
 void
-vSigIntHandler (int sig) {
+vCleanup (void) {
 
   if ( (ctx.bIsPolling) && (!ctx.bIsWrite)) {
 
@@ -1366,14 +1383,19 @@ vSigIntHandler (int sig) {
   iChipIoClose (xChip);
 // -----------------------------------------------------------------------------
 #endif /* USE_CHIPIO defined */
-  if (sig == SIGINT) {
+  if (g_bExitSignal == SIGINT) {
     printf ("\neverything was closed.\nHave a nice day !\n");
   }
   else {
     putchar ('\n');
   }
   fflush (stdout);
-  exit (ctx.iErrorCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+}
+
+// -----------------------------------------------------------------------------
+void
+vSigIntHandler (int sig) {
+  g_bExitSignal = sig;
 }
 
 // -----------------------------------------------------------------------------
