@@ -1844,16 +1844,11 @@ fSwapFloat (float f) {
 // -----------------------------------------------------------------------------
 int32_t
 lSwapLong (int32_t l) {
-  int32_t ret = l;
-
   if (ctx.bIsBigEndian) {
-
-    uint16_t *in = (uint16_t *) &l;
-    uint16_t *out = (uint16_t *) &ret;
-    out[0] = in[1];
-    out[1] = in[0];
+    uint32_t u = (uint32_t) l;
+    return (int32_t) ((u << 16) | (u >> 16));
   }
-  return ret;
+  return l;
 }
 
 // -----------------------------------------------------------------------------
