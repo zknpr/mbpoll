@@ -316,14 +316,12 @@ static xMbPollContext ctx = {
 #include <sysio/rpi.h>
 
 /* private variables ======================================================== */
-// Parameters
-static int iChipIoSlaveAddr = DEFAULT_CHIPIO_SLAVEADDR;
-static int iChipIoIrqPin    = DEFAULT_CHIPIO_IRQPIN;
-//static bool  bIsChipIo = false;
-
-// Working variables
-static xChipIo * xChip;
-static xChipIoSerial * xChipSerial;
+struct xChipIoContext {
+  int iSlaveAddr;
+  int iIrqPin;
+  xChipIo * xChip;
+  xChipIoSerial * xChipSerial;
+};
 
 /* constants ================================================================ */
 static const char sChipIoSlaveAddrStr[] = "chipio slave address";
@@ -450,6 +448,15 @@ main (int argc, char **argv) {
   char * p;
 
   progname = argv[0];
+
+#ifdef USE_CHIPIO
+  ctx.xChip = calloc (1, sizeof (xChipIoContext));
+  if (ctx.xChip == NULL) {
+    vIoErrorExit ("Memory allocation failed for chipio context");
+  }
+  ctx.xChip->iSlaveAddr = DEFAULT_CHIPIO_SLAVEADDR;
+  ctx.xChip->iIrqPin = DEFAULT_CHIPIO_IRQPIN;
+#endif
 
   do  {
 
@@ -590,14 +597,14 @@ main (int argc, char **argv) {
 // -----------------------------------------------------------------------------
         // ChipIo --------------------------------------------------------------
       case 'i':
-        iChipIoSlaveAddr = iGetInt (sChipIoSlaveAddrStr, optarg, 0);
-        vCheckIntRange (sChipIoSlaveAddrStr, iChipIoSlaveAddr,
+        ctx.xChip->iSlaveAddr = iGetInt (sChipIoSlaveAddrStr, optarg, 0);
+        vCheckIntRange (sChipIoSlaveAddrStr, ctx.xChip->iSlaveAddr,
                         CHIPIO_SLAVEADDR_MIN, CHIPIO_SLAVEADDR_MAX);
         ctx.bIsChipIo = true;
         break;
 
       case 'n':
-        iChipIoIrqPin = iGetInt (sChipIoIrqPinStr, optarg, 0);
+        ctx.xChip->iIrqPin = iGetInt (sChipIoIrqPinStr, optarg, 0);
         ctx.bIsChipIo = true;
         break;
 // -----------------------------------------------------------------------------
@@ -677,18 +684,18 @@ main (int argc, char **argv) {
             ctx.bIsChipIo) {
 
     // Ouverture de la liaison i2c vers le chipio
-    xChip = xChipIoOpen (ctx.sDevice, iChipIoSlaveAddr);
-    if (xChip) {
-      xDin xChipIrqPin = { .num = iChipIoIrqPin, .act = true,
+    ctx.xChip->xChip = xChipIoOpen (ctx.sDevice, ctx.xChip->iSlaveAddr);
+    if (ctx.xChip->xChip) {
+      xDin xChipIrqPin = { .num = ctx.xChip->iIrqPin, .act = true,
                            .pull = ePullOff
                          };
       // Create virtual serial port
-      xChipSerial = xChipIoSerialNew (xChip, &xChipIrqPin);
-      if (xChipSerial) {
+      ctx.xChip->xChipSerial = xChipIoSerialNew (ctx.xChip->xChip, &xChipIrqPin);
+      if (ctx.xChip->xChipSerial) {
 
         // The virtual serial port will be used by libmodbus as a normal port
-        ctx.sDevice = sChipIoSerialPortName (xChipSerial);
-        if (iChipIoSerialSetAttr (xChipSerial, &ctx.xRtu) != 0) {
+        ctx.sDevice = sChipIoSerialPortName (ctx.xChip->xChipSerial);
+        if (iChipIoSerialSetAttr (ctx.xChip->xChipSerial, &ctx.xRtu) != 0) {
 
           vIoErrorExit ("Unable to set-up serial chipio port");
         }
@@ -1362,8 +1369,11 @@ vSigIntHandler (int sig) {
   modbus_free (ctx.xBus);
 #ifdef USE_CHIPIO
 // -----------------------------------------------------------------------------
-  vChipIoSerialDelete (xChipSerial);
-  iChipIoClose (xChip);
+  if (ctx.xChip) {
+    vChipIoSerialDelete (ctx.xChip->xChipSerial);
+    iChipIoClose (ctx.xChip->xChip);
+    free (ctx.xChip);
+  }
 // -----------------------------------------------------------------------------
 #endif /* USE_CHIPIO defined */
   if (sig == SIGINT) {
