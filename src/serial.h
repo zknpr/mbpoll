@@ -98,13 +98,6 @@ typedef struct xSerialIos {
 const char * sSerialAttrToStr (const xSerialIos * xIos);
 
 /**
- * Returns current flow control type as human-readable string
- *
- * @param fd file descriptor of the port
- */
-const char * sSerialGetFlowStr (int fd);
-
-/**
  * Returns a string describing the port configuration
  *
  * Format is BBBBBB-DPSF where:
