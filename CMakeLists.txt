@@ -52,7 +52,7 @@ else()
   # On Unix, use system libmodbus via pkg-config
   # Note: 3.1.7+ required for quirks support (-Q/-X options)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(LIBMODBUS REQUIRED libmodbus>=3.1.7)
+  pkg_check_modules(LIBMODBUS libmodbus>=3.1.7)
 endif()
 
 # Search for piduino (optional, for GPIO-based RS-485 RTS control)
@@ -83,6 +83,7 @@ WriteGitVersionFile(${CMAKE_CURRENT_BINARY_DIR}/version-git.h)
 set(MBPOLL_VERSION_STRING
   ${MBPOLL_VERSION_MAJOR}.${MBPOLL_VERSION_MINOR}.${MBPOLL_VERSION_PATCH})
 
+if(LIBMODBUS_FOUND OR WIN32)
 # Define source files
 set(MBPOLL_SOURCES
   ${CMAKE_SOURCE_DIR}/src/mbpoll.c
@@ -232,6 +233,9 @@ if(CPACK_GENERATOR STREQUAL "DEB")
 endif()
 
 include(CPack)
+else()
+  message(WARNING "libmodbus not found, mbpoll executable will not be built. Only tests will be built if enabled.")
+endif()
 
 # Print configuration summary
 message(STATUS "")
@@ -241,3 +245,9 @@ message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  GPIO RTS support: ${MBPOLL_GPIO_RTS}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
+
+# Testing
+enable_testing()
+add_executable(test_serial tests/test_serial.c src/serial.c)
+target_include_directories(test_serial PRIVATE src)
+add_test(NAME test_serial COMMAND test_serial)
