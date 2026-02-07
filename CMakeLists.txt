@@ -52,7 +52,7 @@ else()
   # On Unix, use system libmodbus via pkg-config
   # Note: 3.1.7+ required for quirks support (-Q/-X options)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(LIBMODBUS REQUIRED libmodbus>=3.1.7)
+  pkg_check_modules(LIBMODBUS libmodbus>=3.1.7)
 endif()
 
 # Search for piduino (optional, for GPIO-based RS-485 RTS control)
@@ -88,6 +88,7 @@ set(MBPOLL_SOURCES
   ${CMAKE_SOURCE_DIR}/src/mbpoll.c
   ${CMAKE_SOURCE_DIR}/src/custom-rts.c
   ${CMAKE_SOURCE_DIR}/src/serial.c
+  ${CMAKE_SOURCE_DIR}/src/utils.c
   ${LIBMODBUS_SRCS}
   ${GETOPT_SOURCES})
 
@@ -99,87 +100,91 @@ if(WIN32)
   list(APPEND MBPOLL_SOURCES ${CMAKE_SOURCE_DIR}/libmodbus/src/win32/modbus.rc)
 endif()
 
-# Create the executable
-add_executable(mbpoll ${MBPOLL_SOURCES})
+if(LIBMODBUS_FOUND OR WIN32)
+  # Create the executable
+  add_executable(mbpoll ${MBPOLL_SOURCES})
 
-# Include directories
-target_include_directories(mbpoll PRIVATE
-  ${CMAKE_SOURCE_DIR}
-  ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${LIBMODBUS_INCLUDE_DIRS}
-  ${GETOPT_INCLUDE_DIR})
+  # Include directories
+  target_include_directories(mbpoll PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${LIBMODBUS_INCLUDE_DIRS}
+    ${GETOPT_INCLUDE_DIR})
 
-# Compiler-specific options
-if(MSVC)
-  target_compile_definitions(mbpoll PRIVATE _CRT_SECURE_NO_WARNINGS)
-else()
-  # Common warning flags
-  target_compile_options(mbpoll PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wformat-security
-    -Wno-unused-parameter
-    -Wno-unused-function
-    -Wno-unused-const-variable)
+  # Compiler-specific options
+  if(MSVC)
+    target_compile_definitions(mbpoll PRIVATE _CRT_SECURE_NO_WARNINGS)
+  else()
+    # Common warning flags
+    target_compile_options(mbpoll PRIVATE
+      -Wall
+      -Wextra
+      -Wpedantic
+      -Wformat-security
+      -Wno-unused-parameter
+      -Wno-unused-function
+      -Wno-unused-const-variable)
 
-  # Security hardening (Release builds)
-  target_compile_options(mbpoll PRIVATE
-    $<$<CONFIG:Release>:-fstack-protector-strong>
-    $<$<CONFIG:RelWithDebInfo>:-fstack-protector-strong>)
+    # Security hardening (Release builds)
+    target_compile_options(mbpoll PRIVATE
+      $<$<CONFIG:Release>:-fstack-protector-strong>
+      $<$<CONFIG:RelWithDebInfo>:-fstack-protector-strong>)
 
-  target_compile_definitions(mbpoll PRIVATE
-    $<$<CONFIG:Release>:_FORTIFY_SOURCE=2>
-    $<$<CONFIG:Release>:NDEBUG>
-    $<$<CONFIG:RelWithDebInfo>:_FORTIFY_SOURCE=2>)
+    target_compile_definitions(mbpoll PRIVATE
+      $<$<CONFIG:Release>:_FORTIFY_SOURCE=2>
+      $<$<CONFIG:Release>:NDEBUG>
+      $<$<CONFIG:RelWithDebInfo>:_FORTIFY_SOURCE=2>)
 
-  # Debug build with Address Sanitizer support
-  target_compile_options(mbpoll PRIVATE
-    $<$<CONFIG:Debug>:-g>
-    $<$<CONFIG:Debug>:-O0>
-    $<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
+    # Debug build with Address Sanitizer support
+    target_compile_options(mbpoll PRIVATE
+      $<$<CONFIG:Debug>:-g>
+      $<$<CONFIG:Debug>:-O0>
+      $<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
 
-  # Optional: Enable sanitizers in debug mode (uncomment to use)
-  # target_compile_options(mbpoll PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
-  # target_link_options(mbpoll PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
-endif()
+    # Optional: Enable sanitizers in debug mode (uncomment to use)
+    # target_compile_options(mbpoll PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+    # target_link_options(mbpoll PRIVATE $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+  endif()
 
-# Compile definitions
-target_compile_definitions(mbpoll PRIVATE _GNU_SOURCE)
-
-if(MBPOLL_GPIO_RTS)
-  target_compile_definitions(mbpoll PRIVATE MBPOLL_GPIO_RTS)
-  target_include_directories(mbpoll PRIVATE ${PIDUINO_INCLUDE_DIRS})
-endif()
-
-# Link libraries
-if(WIN32)
-  target_link_libraries(mbpoll PRIVATE wsock32 ws2_32)
-else()
-  target_link_libraries(mbpoll PRIVATE ${LIBMODBUS_LIBRARIES})
-  target_link_directories(mbpoll PRIVATE ${LIBMODBUS_LIBRARY_DIRS})
-  target_compile_options(mbpoll PRIVATE ${LIBMODBUS_CFLAGS_OTHER})
+  # Compile definitions
+  target_compile_definitions(mbpoll PRIVATE _GNU_SOURCE)
 
   if(MBPOLL_GPIO_RTS)
-    target_link_libraries(mbpoll PRIVATE ${PIDUINO_LIBRARIES})
-    target_link_directories(mbpoll PRIVATE ${PIDUINO_LIBRARY_DIRS})
+    target_compile_definitions(mbpoll PRIVATE MBPOLL_GPIO_RTS)
+    target_include_directories(mbpoll PRIVATE ${PIDUINO_INCLUDE_DIRS})
   endif()
-endif()
 
-# Windows pre-build step for libmodbus configuration
-if(WIN32)
-  add_custom_command(
-    TARGET mbpoll PRE_BUILD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/libmodbus/src/win32
-    COMMAND ${CSCRIPT_PATH} ${CMAKE_SOURCE_DIR}/libmodbus/src/win32/configure.js
-    VERBATIM)
-endif()
+  # Link libraries
+  if(WIN32)
+    target_link_libraries(mbpoll PRIVATE wsock32 ws2_32)
+  else()
+    target_link_libraries(mbpoll PRIVATE ${LIBMODBUS_LIBRARIES})
+    target_link_directories(mbpoll PRIVATE ${LIBMODBUS_LIBRARY_DIRS})
+    target_compile_options(mbpoll PRIVATE ${LIBMODBUS_CFLAGS_OTHER})
 
-# Install target
-install(TARGETS mbpoll
-  RUNTIME DESTINATION bin
-  PERMISSIONS ${PROGRAM_PERMISSIONS})
+    if(MBPOLL_GPIO_RTS)
+      target_link_libraries(mbpoll PRIVATE ${PIDUINO_LIBRARIES})
+      target_link_directories(mbpoll PRIVATE ${PIDUINO_LIBRARY_DIRS})
+    endif()
+  endif()
+
+  # Windows pre-build step for libmodbus configuration
+  if(WIN32)
+    add_custom_command(
+      TARGET mbpoll PRE_BUILD
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/libmodbus/src/win32
+      COMMAND ${CSCRIPT_PATH} ${CMAKE_SOURCE_DIR}/libmodbus/src/win32/configure.js
+      VERBATIM)
+  endif()
+
+  # Install target
+  install(TARGETS mbpoll
+    RUNTIME DESTINATION bin
+    PERMISSIONS ${PROGRAM_PERMISSIONS})
+else()
+  message(WARNING "libmodbus not found, mbpoll will not be built. Only tests can be run.")
+endif()
 
 # Uninstall target
 configure_file(
@@ -241,3 +246,8 @@ message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  GPIO RTS support: ${MBPOLL_GPIO_RTS}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
+
+# Testing
+enable_testing()
+add_executable(test_utils tests/test_utils.c src/utils.c)
+add_test(NAME test_utils COMMAND test_utils)
