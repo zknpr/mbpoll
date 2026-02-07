@@ -231,6 +231,10 @@ if(CPACK_GENERATOR STREQUAL "DEB")
   set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 endif()
 
+# Testing
+enable_testing()
+add_subdirectory(tests)
+
 include(CPack)
 
 # Print configuration summary
