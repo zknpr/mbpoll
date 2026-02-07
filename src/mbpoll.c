@@ -1829,31 +1829,25 @@ dGetDouble (const char * name, const char * num) {
 // -----------------------------------------------------------------------------
 float
 fSwapFloat (float f) {
-  float ret = f;
-
   if (ctx.bIsBigEndian) {
-
-    uint16_t *in = (uint16_t *) &f;
-    uint16_t *out = (uint16_t *) &ret;
-    out[0] = in[1];
-    out[1] = in[0];
+    uint32_t u;
+    memcpy (&u, &f, sizeof (u));
+    u = ((u << 16) | (u >> 16));
+    memcpy (&f, &u, sizeof (f));
   }
-  return ret;
+  return f;
 }
 
 // -----------------------------------------------------------------------------
 int32_t
 lSwapLong (int32_t l) {
-  int32_t ret = l;
-
   if (ctx.bIsBigEndian) {
-
-    uint16_t *in = (uint16_t *) &l;
-    uint16_t *out = (uint16_t *) &ret;
-    out[0] = in[1];
-    out[1] = in[0];
+    uint32_t u;
+    memcpy (&u, &l, sizeof (u));
+    u = ((u << 16) | (u >> 16));
+    memcpy (&l, &u, sizeof (l));
   }
-  return ret;
+  return l;
 }
 
 // -----------------------------------------------------------------------------
