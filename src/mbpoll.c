@@ -1081,29 +1081,33 @@ vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx) {
   for (i = 0; i < iCount; i++) {
 
     // Print address in hex or decimal format
-    // Using separate printf calls to avoid UB from %X with signed int
-    if (ctx->bPrintHex) {
-      printf ("[0x%04X]: \t", (unsigned int)iAddr);
-    } else {
-      printf ("[%d]: \t", iAddr);
-    }
-
+    // Using combined printf calls to reduce overhead
     switch (ctx->eFormat) {
 
       case eFormatBin:
-        printf ("%c", (DUINT8 (ctx->pvData, i) != FALSE) ? '1' : '0');
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t%c\n", (unsigned int)iAddr, (DUINT8 (ctx->pvData, i) != FALSE) ? '1' : '0');
+        } else {
+          printf ("[%d]: \t%c\n", iAddr, (DUINT8 (ctx->pvData, i) != FALSE) ? '1' : '0');
+        }
         iAddr++;
         break;
 
       case eFormatDec: {
         uint16_t v = DUINT16 (ctx->pvData, i);
         if (v & 0x8000) {
-
-          printf ("%u (%d)", v, (int) (int16_t) v);
+          if (ctx->bPrintHex) {
+            printf ("[0x%04X]: \t%u (%d)\n", (unsigned int)iAddr, v, (int) (int16_t) v);
+          } else {
+            printf ("[%d]: \t%u (%d)\n", iAddr, v, (int) (int16_t) v);
+          }
         }
         else {
-
-          printf ("%u", v);
+          if (ctx->bPrintHex) {
+            printf ("[0x%04X]: \t%u\n", (unsigned int)iAddr, v);
+          } else {
+            printf ("[%d]: \t%u\n", iAddr, v);
+          }
         }
         iAddr++;
 
@@ -1111,34 +1115,53 @@ vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx) {
       break;
 
       case eFormatInt16:
-        printf ("%d", (int) (int16_t) (DUINT16 (ctx->pvData, i)));
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t%d\n", (unsigned int)iAddr, (int) (int16_t) (DUINT16 (ctx->pvData, i)));
+        } else {
+          printf ("[%d]: \t%d\n", iAddr, (int) (int16_t) (DUINT16 (ctx->pvData, i)));
+        }
         iAddr++;
         break;
 
       case eFormatHex:
-        printf ("0x%04X", DUINT16 (ctx->pvData, i));
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t0x%04X\n", (unsigned int)iAddr, DUINT16 (ctx->pvData, i));
+        } else {
+          printf ("[%d]: \t0x%04X\n", iAddr, DUINT16 (ctx->pvData, i));
+        }
         iAddr++;
         break;
 
       case eFormatString:
-        printf ("%c%c", (char) ((int) (DUINT16 (ctx->pvData, i) / 256)), (char) (DUINT16 (ctx->pvData, i) % 256));
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t%c%c\n", (unsigned int)iAddr, (char) ((int) (DUINT16 (ctx->pvData, i) / 256)), (char) (DUINT16 (ctx->pvData, i) % 256));
+        } else {
+          printf ("[%d]: \t%c%c\n", iAddr, (char) ((int) (DUINT16 (ctx->pvData, i) / 256)), (char) (DUINT16 (ctx->pvData, i) % 256));
+        }
         iAddr++;
         break;
 
       case eFormatInt:
-        printf ("%d", lSwapLong (DINT32 (ctx->pvData, i)));
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t%d\n", (unsigned int)iAddr, lSwapLong (DINT32 (ctx->pvData, i)));
+        } else {
+          printf ("[%d]: \t%d\n", iAddr, lSwapLong (DINT32 (ctx->pvData, i)));
+        }
         iAddr += 2;
         break;
 
       case eFormatFloat:
-        printf ("%g", fSwapFloat (DFLOAT (ctx->pvData, i)));
+        if (ctx->bPrintHex) {
+          printf ("[0x%04X]: \t%g\n", (unsigned int)iAddr, fSwapFloat (DFLOAT (ctx->pvData, i)));
+        } else {
+          printf ("[%d]: \t%g\n", iAddr, fSwapFloat (DFLOAT (ctx->pvData, i)));
+        }
         iAddr += 2;
         break;
 
       default:  // Impossible normalement
         break;
     }
-    putchar ('\n');
   }
 }
 
