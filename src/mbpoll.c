@@ -370,7 +370,7 @@ const char * sModeToStr (eModes eMode);
 void vSigIntHandler (int sig);
 float fSwapFloat (float f);
 int32_t lSwapLong (int32_t l);
-void mb_delay (unsigned long d);
+static void mb_delay (unsigned long d);
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 // Portage des fonctions Microsoft
@@ -1857,22 +1857,16 @@ lSwapLong (int32_t l) {
 }
 
 // -----------------------------------------------------------------------------
-void
+static void
 mb_delay (unsigned long d) {
 
   if (d) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    if (d == -1) {
+    struct timespec dt;
 
-      sleep (-1);
-    }
-    else {
-      struct timespec dt;
-
-      dt.tv_nsec = (d % 1000UL) * 1000000UL;
-      dt.tv_sec  = d / 1000UL;
-      nanosleep (&dt, NULL);
-    }
+    dt.tv_nsec = (d % 1000UL) * 1000000UL;
+    dt.tv_sec  = d / 1000UL;
+    nanosleep (&dt, NULL);
 #else
     Sleep (d);
 #endif
