@@ -343,7 +343,7 @@ static const char * short_options = "m:a:r:c:t:1l:o:p:b:d:s:P:u0WRFhVvwBqxQX";
 
 /* private functions ======================================================== */
 void vAllocate (xMbPollContext * ctx);
-void vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx);
+static void vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx);
 void vPrintConfig (const xMbPollContext * ctx);
 void vPrintCommunicationSetup (const xMbPollContext * ctx);
 void vReportSlaveID (const xMbPollContext * ctx);
@@ -1075,7 +1075,7 @@ main (int argc, char **argv) {
 /* private functions ======================================================== */
 
 // -----------------------------------------------------------------------------
-void
+static void
 vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx) {
   int i;
   for (i = 0; i < iCount; i++) {
