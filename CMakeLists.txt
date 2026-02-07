@@ -86,6 +86,7 @@ set(MBPOLL_VERSION_STRING
 # Define source files
 set(MBPOLL_SOURCES
   ${CMAKE_SOURCE_DIR}/src/mbpoll.c
+  ${CMAKE_SOURCE_DIR}/src/utils.c
   ${CMAKE_SOURCE_DIR}/src/custom-rts.c
   ${CMAKE_SOURCE_DIR}/src/serial.c
   ${LIBMODBUS_SRCS}
@@ -241,3 +242,8 @@ message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  GPIO RTS support: ${MBPOLL_GPIO_RTS}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
+
+# Testing
+enable_testing()
+add_executable(test_utils tests/test_utils.c src/utils.c)
+add_test(NAME test_utils COMMAND test_utils)

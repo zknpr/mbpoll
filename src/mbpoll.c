@@ -40,6 +40,7 @@
 #include "custom-rts.h"
 #include "version-git.h"
 #include "mbpoll-config.h"
+#include "utils.h"
 
 /* constants ================================================================ */
 #define AUTHORS "Pascal JEAN"
@@ -368,8 +369,6 @@ const char * sEnumToStr (int iElmt, const int * iList,
 const char * sFunctionToStr (eFunctions eFunction);
 const char * sModeToStr (eModes eMode);
 void vSigIntHandler (int sig);
-float fSwapFloat (float f);
-int32_t lSwapLong (int32_t l);
 void mb_delay (unsigned long d);
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
@@ -762,15 +761,15 @@ main (int argc, char **argv) {
 
           case eFuncHoldingReg:
             if (ctx.eFormat == eFormatInt) {
-              DINT32 (ctx.pvData, i) = lSwapLong (iGetInt (sDataStr, argv[arg], 10));
-              PDEBUG ("Int[%d]=%"PRId32"\n", i, lSwapLong (DINT32 (ctx.pvData, i)));
+              DINT32 (ctx.pvData, i) = lSwapLong (iGetInt (sDataStr, argv[arg], 10), ctx.bIsBigEndian);
+              PDEBUG ("Int[%d]=%"PRId32"\n", i, lSwapLong (DINT32 (ctx.pvData, i), ctx.bIsBigEndian));
             }
             else if (ctx.eFormat == eFormatFloat) {
               dValue = dGetDouble (sDataStr, argv[arg]);
               PDEBUG ("%g,%g\n", FLT_MIN, FLT_MAX);
               vCheckDoubleRange (sDataStr, dValue, -FLT_MAX, FLT_MAX);
-              DFLOAT (ctx.pvData, i) = fSwapFloat ( (float) dValue);
-              PDEBUG ("Float[%d]=%g\n", i, fSwapFloat (DFLOAT (ctx.pvData, i)));
+              DFLOAT (ctx.pvData, i) = fSwapFloat ( (float) dValue, ctx.bIsBigEndian);
+              PDEBUG ("Float[%d]=%g\n", i, fSwapFloat (DFLOAT (ctx.pvData, i), ctx.bIsBigEndian));
             }
             else if (ctx.eFormat == eFormatString) {
                 vSyntaxErrorExit ("You can use string format only for output");
@@ -1126,12 +1125,12 @@ vPrintReadValues (int iAddr, int iCount, xMbPollContext * ctx) {
         break;
 
       case eFormatInt:
-        printf ("%d", lSwapLong (DINT32 (ctx->pvData, i)));
+        printf ("%d", lSwapLong (DINT32 (ctx->pvData, i), ctx->bIsBigEndian));
         iAddr += 2;
         break;
 
       case eFormatFloat:
-        printf ("%g", fSwapFloat (DFLOAT (ctx->pvData, i)));
+        printf ("%g", fSwapFloat (DFLOAT (ctx->pvData, i), ctx->bIsBigEndian));
         iAddr += 2;
         break;
 
@@ -1826,35 +1825,6 @@ dGetDouble (const char * name, const char * num) {
   return d;
 }
 
-// -----------------------------------------------------------------------------
-float
-fSwapFloat (float f) {
-  float ret = f;
-
-  if (ctx.bIsBigEndian) {
-
-    uint16_t *in = (uint16_t *) &f;
-    uint16_t *out = (uint16_t *) &ret;
-    out[0] = in[1];
-    out[1] = in[0];
-  }
-  return ret;
-}
-
-// -----------------------------------------------------------------------------
-int32_t
-lSwapLong (int32_t l) {
-  int32_t ret = l;
-
-  if (ctx.bIsBigEndian) {
-
-    uint16_t *in = (uint16_t *) &l;
-    uint16_t *out = (uint16_t *) &ret;
-    out[0] = in[1];
-    out[1] = in[0];
-  }
-  return ret;
-}
 
 // -----------------------------------------------------------------------------
 void
