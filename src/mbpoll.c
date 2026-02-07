@@ -1716,13 +1716,24 @@ iGetIntList (const char * name, const char * sList, int * iLen) {
         // i is the last of a range first:last
         iLast = MAX (iFirst, i);
         iFirst = MIN (iFirst, i);
+
+        if ((long long)iLast - (long long)iFirst + 1 > INT_MAX) {
+            vSyntaxErrorExit ("Range too large in %s", name);
+        }
         iRange = iLast - iFirst + 1;
         PDEBUG ("Is Last, add %d items\n", iRange);
+
+        if (iCount > INT_MAX - iRange) {
+             vSyntaxErrorExit ("List too large in %s", name);
+        }
         iCount += iRange;
         bIsLast = false;
       }
       else {
 
+        if (iCount == INT_MAX) {
+             vSyntaxErrorExit ("List too large in %s", name);
+        }
         iCount++;
       }
     }
@@ -1862,7 +1873,7 @@ mb_delay (unsigned long d) {
 
   if (d) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    if (d == -1) {
+    if (d == (unsigned long)-1) {
 
       sleep (-1);
     }
