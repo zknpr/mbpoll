@@ -997,10 +997,12 @@ main (int argc, char **argv) {
         // Read -------------------------------------------------------------
         for (i = 0; i < ctx.iSlaveCount; i++) {
 
-          iRet = modbus_set_slave (ctx.xBus, ctx.piSlaveAddr[i]);
-          if (iRet != 0) {
-            vIoErrorExit ("Setting slave address failed: %s",
-                          modbus_strerror (errno));
+          if (modbus_get_slave (ctx.xBus) != ctx.piSlaveAddr[i]) {
+            iRet = modbus_set_slave (ctx.xBus, ctx.piSlaveAddr[i]);
+            if (iRet != 0) {
+              vIoErrorExit ("Setting slave address failed: %s",
+                            modbus_strerror (errno));
+            }
           }
           ctx.iTxCount++;
 
