@@ -1014,48 +1014,103 @@ main (int argc, char **argv) {
             putchar ('\n');
           }
 
-          int j;
-          for (j = 0; j < ctx.iStartCount; j++) {
-            // libmodbus utilise les adresses PDU !
-            iStartReg = ctx.piStartRef[j] - ctx.iPduOffset;
+          // Optimized batch reading
+          // Buffer size: Max 2000 bits (2000 bytes) or 125 regs (250 bytes)
+          // Using uint16_t array for alignment (2048 bytes total)
+          uint16_t batch_buffer[1024];
+          void *original_pvData = ctx.pvData;
+          int j = 0;
+
+          while (j < ctx.iStartCount) {
+            int k;
+            int start_addr = ctx.piStartRef[j];
+            int unit_size_regs = iNbReg;
+            int max_count;
+            bool is_bits = (ctx.eFunction == eFuncCoil || ctx.eFunction == eFuncDiscreteInput);
+
+            if (is_bits) {
+              max_count = 2000; // Max bits per request
+            }
+            else {
+              max_count = 125; // Max registers per request
+            }
+
+            // Identify contiguous batch
+            int expected_next_addr = start_addr + unit_size_regs;
+            k = j + 1;
+            while (k < ctx.iStartCount) {
+              int next_addr = ctx.piStartRef[k];
+              // Strict contiguity check (no gaps)
+              if (next_addr != expected_next_addr) {
+                break;
+              }
+              // Check max count limit
+              if ((next_addr + unit_size_regs - start_addr) > max_count) {
+                break;
+              }
+              expected_next_addr = next_addr + unit_size_regs;
+              k++;
+            }
+
+            // Perform batched read
+            // Number of Modbus units (bits or registers) to read
+            int read_qty = ctx.piStartRef[k - 1] + unit_size_regs - start_addr;
+            iStartReg = start_addr - ctx.iPduOffset;
 
             switch (ctx.eFunction) {
               case eFuncDiscreteInput:
-                iRet = modbus_read_input_bits (ctx.xBus, iStartReg, iNbReg,
-                                               ctx.pvData);
+                iRet = modbus_read_input_bits (ctx.xBus, iStartReg, read_qty,
+                                               (uint8_t *) batch_buffer);
                 break;
 
               case eFuncCoil:
-                iRet = modbus_read_bits (ctx.xBus, iStartReg, iNbReg,
-                                         ctx.pvData);
+                iRet = modbus_read_bits (ctx.xBus, iStartReg, read_qty,
+                                         (uint8_t *) batch_buffer);
                 break;
 
               case eFuncInputReg:
-                iRet = modbus_read_input_registers (ctx.xBus, iStartReg, iNbReg,
-                                                    ctx.pvData);
+                iRet = modbus_read_input_registers (ctx.xBus, iStartReg, read_qty,
+                                                    batch_buffer);
                 break;
 
               case eFuncHoldingReg:
-                iRet = modbus_read_registers (ctx.xBus, iStartReg, iNbReg,
-                                              ctx.pvData);
+                iRet = modbus_read_registers (ctx.xBus, iStartReg, read_qty,
+                                              batch_buffer);
                 break;
 
-              default: // Impossible, value has been verified, prevents gcc warning
+              default:
+                iRet = -1;
                 break;
-
             }
-            if (iRet == iNbReg) {
 
+            if (iRet == read_qty) {
               ctx.iRxCount++;
-              vPrintReadValues (ctx.piStartRef[j], ctx.iCount, &ctx);
+              // Iterate and print individual values
+              int m;
+              for (m = j; m < k; m++) {
+                int offset_units = ctx.piStartRef[m] - start_addr;
+                if (is_bits) {
+                  ctx.pvData = ((uint8_t *) batch_buffer) + offset_units;
+                }
+                else {
+                  ctx.pvData = batch_buffer + offset_units;
+                }
+                vPrintReadValues (ctx.piStartRef[m], ctx.iCount, &ctx);
+              }
             }
             else {
+              // On failure, we report error.
+              // Note: This fails the whole batch.
+              // We could fallback to single reads, but for now we report error.
               ctx.iErrorCount++;
               fprintf (stderr, "Read %s failed: %s\n",
                        sFunctionToStr (ctx.eFunction),
                        modbus_strerror (errno));
             }
+            // Advance
+            j = k;
           }
+          ctx.pvData = original_pvData;
           if (ctx.bIsPolling) {
 
             mb_delay (ctx.iPollRate);
