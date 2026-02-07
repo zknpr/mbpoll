@@ -13,7 +13,6 @@
  * You should have received a copy of the GNU General Public License
  * along with mbpoll.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <string.h>
@@ -25,9 +24,6 @@
 #include <signal.h>
 #include <float.h>
 #include <inttypes.h>
-#include <modbus.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <time.h>
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 #include <unistd.h>
@@ -36,10 +32,10 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include "serial.h"
+#include "mbpoll.h"
+#include "chipio.h"
 #include "custom-rts.h"
 #include "version-git.h"
-#include "mbpoll-config.h"
 
 /* constants ================================================================ */
 #define AUTHORS "Pascal JEAN"
@@ -74,30 +70,7 @@
 #endif
 
 /* types ==================================================================== */
-typedef enum {
-  eModeRtu,
-  eModeTcp,
-  eModeUnknown = -1,
-} eModes;
-
-typedef enum {
-  eFuncCoil = 0,
-  eFuncDiscreteInput = 1,
-  eFuncInputReg = 3,
-  eFuncHoldingReg = 4,
-  eFuncUnknown = -1,
-} eFunctions;
-
-typedef enum {
-  eFormatDec,
-  eFormatInt16,
-  eFormatHex,
-  eFormatString,
-  eFormatInt,
-  eFormatFloat,
-  eFormatBin,
-  eFormatUnknown = -1,
-} eFormats;
+// Moved to mbpoll.h
 
 /* macros =================================================================== */
 #define SIZEOF_ILIST(list) (sizeof(list)/sizeof(int))
@@ -214,55 +187,7 @@ static const char sRtsPinStr[] = "RTS pin";
 #endif
 
 /* structures =============================================================== */
-typedef struct xChipIoContext xChipIoContext;
-
-typedef struct xMbPollContext {
-
-  // Parameters
-  eModes eMode;
-  eFunctions eFunction;
-  eFormats eFormat;
-  int * piSlaveAddr;
-  int iSlaveCount;
-  int * piStartRef;
-  int iStartCount;
-  int iCount;
-  int iPollRate;
-  double dTimeout;
-  char * sTcpPort;
-  char * sDevice;
-  xSerialIos xRtu;
-  int iRtuBaudrate;
-  eSerialDataBits eRtuDatabits;
-  eSerialStopBits eRtuStopbits;
-  eSerialParity eRtuParity;
-  bool bIsVerbose;
-  bool bIsPolling;
-  int  iRtuMode;
-  bool bIsWrite;
-  bool bIsReportSlaveID;
-  bool bIsDefaultMode;
-  int iPduOffset;
-  bool bWriteSingleAsMany;
-  bool bIsChipIo;
-  bool bIsBigEndian;
-  bool bIsQuiet;
-  bool bPrintHex;
-  bool bEnableMaxSlaveQuirk;
-  bool bEnableReplyToBroadcastQuirk;
-#ifdef MBPOLL_GPIO_RTS
-  int iRtsPin;
-#endif
-
-  // Working variables
-  modbus_t * xBus;
-  void * pvData;
-  int iTxCount;
-  int iRxCount;
-  int iErrorCount;
-
-  xChipIoContext * xChip; // TODO: separate the chipio part
-} xMbPollContext;
+// Moved to mbpoll.h
 
 /* private variables ======================================================== */
 
@@ -307,39 +232,19 @@ static xMbPollContext ctx = {
 
   // Working variables
   .xBus = NULL,
-  .pvData = NULL
+  .pvData = NULL,
+  .xChip = NULL
 };
 
 #ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-#include <chipio/serial.h>
-#include <sysio/rpi.h>
-
-/* private variables ======================================================== */
-// Parameters
-static int iChipIoSlaveAddr = DEFAULT_CHIPIO_SLAVEADDR;
-static int iChipIoIrqPin    = DEFAULT_CHIPIO_IRQPIN;
-//static bool  bIsChipIo = false;
-
-// Working variables
-static xChipIo * xChip;
-static xChipIoSerial * xChipSerial;
-
-/* constants ================================================================ */
-static const char sChipIoSlaveAddrStr[] = "chipio slave address";
-static const char sChipIoIrqPinStr[] = "chipio irq pin";
-// additional options -i and -n for chipio
 static const char * short_options = "m:a:r:c:t:1l:o:p:b:d:s:P:u0WRhVvwBqi:n:xQX";
-
-#else /* USE_CHIPIO == 0 */
-/* constants ================================================================ */
+#else
 #ifdef MBPOLL_GPIO_RTS
 static const char * short_options = "m:a:r:c:t:1l:o:p:b:d:s:P:u0WR::F::hVvwBqxQX";
 #else
 static const char * short_options = "m:a:r:c:t:1l:o:p:b:d:s:P:u0WRFhVvwBqxQX";
 #endif
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO == 0 */
+#endif
 
 /* private functions ======================================================== */
 void vAllocate (xMbPollContext * ctx);
@@ -351,13 +256,10 @@ void vHello (void);
 void vVersion (void);
 void vWarranty (void);
 void vUsage (FILE *stream, int exit_msg);
-void vFailureExit (bool bHelp, const char *format, ...);
-#define vSyntaxErrorExit(fmt,...) vFailureExit(true,fmt,##__VA_ARGS__)
-#define vIoErrorExit(fmt,...) vFailureExit(false,fmt,##__VA_ARGS__)
+// vFailureExit defined below but declared in mbpoll.h
+
 void vCheckEnum (const char * sName, int iElmt, const int * iList, int iSize);
-void vCheckIntRange (const char * sName, int i, int min, int max);
 void vCheckDoubleRange (const char * sName, double d, double min, double max);
-int iGetInt (const char * sName, const char * sNum, int iBase);
 int * iGetIntList (const char * sName, const char * sList, int * iLen);
 void vPrintIntList (int * iList, int iLen);
 double dGetDouble (const char * sName, const char * sNum);
@@ -455,6 +357,11 @@ main (int argc, char **argv) {
 
     iNextOption = getopt (argc, argv, short_options);
     opterr = 0;
+
+    if (iNextOption != -1 && bChipIoHandleOption(iNextOption, optarg, &ctx)) {
+        continue;
+    }
+
     switch (iNextOption) {
 
       case 'v':
@@ -586,23 +493,6 @@ main (int argc, char **argv) {
                                     iParityList, SIZEOF_ILIST (iParityList));
         break;
 
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-        // ChipIo --------------------------------------------------------------
-      case 'i':
-        iChipIoSlaveAddr = iGetInt (sChipIoSlaveAddrStr, optarg, 0);
-        vCheckIntRange (sChipIoSlaveAddrStr, iChipIoSlaveAddr,
-                        CHIPIO_SLAVEADDR_MIN, CHIPIO_SLAVEADDR_MAX);
-        ctx.bIsChipIo = true;
-        break;
-
-      case 'n':
-        iChipIoIrqPin = iGetInt (sChipIoIrqPinStr, optarg, 0);
-        ctx.bIsChipIo = true;
-        break;
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
-
         // Misc. ---------------------------------------------------------------
       case 'h':
         vUsage (stdout, EXIT_SUCCESS);
@@ -671,44 +561,9 @@ main (int argc, char **argv) {
     ctx.eMode = eModeRtu;
     PDEBUG ("Set mode to RTU for serial port\n");
   }
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-  else if ( (strcasestr (ctx.sDevice, "i2c") && ctx.bIsDefaultMode) ||
-            ctx.bIsChipIo) {
-
-    // Ouverture de la liaison i2c vers le chipio
-    xChip = xChipIoOpen (ctx.sDevice, iChipIoSlaveAddr);
-    if (xChip) {
-      xDin xChipIrqPin = { .num = iChipIoIrqPin, .act = true,
-                           .pull = ePullOff
-                         };
-      // Create virtual serial port
-      xChipSerial = xChipIoSerialNew (xChip, &xChipIrqPin);
-      if (xChipSerial) {
-
-        // The virtual serial port will be used by libmodbus as a normal port
-        ctx.sDevice = sChipIoSerialPortName (xChipSerial);
-        if (iChipIoSerialSetAttr (xChipSerial, &ctx.xRtu) != 0) {
-
-          vIoErrorExit ("Unable to set-up serial chipio port");
-        }
-      }
-      else {
-
-        vIoErrorExit ("serial chipio port failure");
-      }
-    }
-    else {
-
-      vIoErrorExit ("chipio not found");
-    }
-
-    ctx.eMode = eModeRtu;
-    ctx.bIsChipIo = true;
-    PDEBUG ("Set mode to RTU for chipio serial port\n");
+  else if (bChipIoSetup(&ctx)) {
+    // ChipIO setup successful or detected
   }
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
   PDEBUG ("Set device=%s\n", ctx.sDevice);
 
   if ( (ctx.bIsReportSlaveID) && (ctx.eMode != eModeRtu)) {
@@ -1210,21 +1065,7 @@ void
 vPrintCommunicationSetup (const xMbPollContext * ctx) {
 
   if (ctx->eMode == eModeRtu) {
-#ifndef USE_CHIPIO
-// -----------------------------------------------------------------------------
-    const char sAddStr[] = "";
-#else /* USE_CHIPIO defined */
-// -----------------------------------------------------------------------------
-    const char * sAddStr;
-    if (ctx->bIsChipIo) {
-      sAddStr = " via ChipIo serial port";
-    }
-    else {
-
-      sAddStr = "";
-    }
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
+    const char * sAddStr = sChipIoGetAddStr(ctx);
 
     printf ("Communication.........: %s%s, %s\n"
             "                        t/o %.2f s, poll rate %d ms\n"
@@ -1360,12 +1201,8 @@ vSigIntHandler (int sig) {
   free (ctx.piStartRef);
   modbus_close (ctx.xBus);
   modbus_free (ctx.xBus);
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-  vChipIoSerialDelete (xChipSerial);
-  iChipIoClose (xChip);
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
+  vChipIoClose(&ctx);
+
   if (sig == SIGINT) {
     printf ("\neverything was closed.\nHave a nice day !\n");
   }
@@ -1457,12 +1294,8 @@ vUsage (FILE * stream, int exit_msg) {
            "                  COM1, COM2 ...              on Windows\n"
            "                  /dev/ttyS0, /dev/ttyS1 ...  on Linux\n"
            "                  /dev/ser1, /dev/ser2 ...    on QNX\n"
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
            "                I2c bus when using ModBus RTU via ChipIo serial port\n"
            "                  /dev/i2c-0, /dev/i2c-1 ...  on Linux\n"
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
            "  host          Host name or dotted IP address when using ModBus/TCP protocol\n"
            "  writevalues   List of values to be written.\n"
 //          01234567890123456789012345678901234567890123456789012345678901234567890123456789
@@ -1531,13 +1364,6 @@ vUsage (FILE * stream, int exit_msg) {
            "  -R            RS-485 mode (/RTS on (0) after sending)\n"
            "  -F            RS-485 mode (/RTS on (0) when sending)\n"
 #endif
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-           "Options for ModBus RTU for ChipIo serial port : \n"
-           "  -i #          I2c slave address (0x%02X-0x%02X, 0x%02X is default)\n"
-           "  -n #          Irq pin number of GPIO (%d is default)\n"
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
            "\n"
            "  -h            Print this help summary page\n"
            "  -V            Print version and exit\n"
@@ -1565,15 +1391,10 @@ vUsage (FILE * stream, int exit_msg) {
            , sSerialDataBitsToStr (DEFAULT_RTU_DATABITS)
            , sSerialStopBitsToStr (DEFAULT_RTU_STOPBITS)
            , sSerialParityToStr (DEFAULT_RTU_PARITY)
-#ifdef USE_CHIPIO
-// -----------------------------------------------------------------------------
-           , CHIPIO_SLAVEADDR_MIN
-           , CHIPIO_SLAVEADDR_MAX
-           , DEFAULT_CHIPIO_SLAVEADDR
-           , DEFAULT_CHIPIO_IRQPIN
-// -----------------------------------------------------------------------------
-#endif /* USE_CHIPIO defined */
            , sMyName);
+
+  vChipIoPrintUsageOptions();
+
   exit (exit_msg);
 }
 
@@ -1862,7 +1683,7 @@ mb_delay (unsigned long d) {
 
   if (d) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    if (d == -1) {
+    if (d == (unsigned long)-1) {
 
       sleep (-1);
     }

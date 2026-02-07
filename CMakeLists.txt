@@ -86,6 +86,7 @@ set(MBPOLL_VERSION_STRING
 # Define source files
 set(MBPOLL_SOURCES
   ${CMAKE_SOURCE_DIR}/src/mbpoll.c
+  ${CMAKE_SOURCE_DIR}/src/chipio.c
   ${CMAKE_SOURCE_DIR}/src/custom-rts.c
   ${CMAKE_SOURCE_DIR}/src/serial.c
   ${LIBMODBUS_SRCS}
