@@ -13,7 +13,9 @@
  * You should have received a copy of the GNU General Public License
  * along with mbpoll.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -1862,7 +1864,7 @@ mb_delay (unsigned long d) {
 
   if (d) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    if (d == -1) {
+    if (d == (unsigned long)-1) {
 
       sleep (-1);
     }
