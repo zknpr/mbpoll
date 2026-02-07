@@ -241,3 +241,6 @@ message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  GPIO RTS support: ${MBPOLL_GPIO_RTS}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
+
+enable_testing()
+add_subdirectory(tests)
