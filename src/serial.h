@@ -98,21 +98,6 @@ typedef struct xSerialIos {
 const char * sSerialAttrToStr (const xSerialIos * xIos);
 
 /**
- * Returns a string describing the port configuration
- *
- * Format is BBBBBB-DPSF where:
- * - BBBBBB Baudrate
- * - D Data bits (5, 6, 7, 8)
- * - P Parity (N, E, O)
- * - S Stop (1, 2)
- * - F Flow (H, S, R, r)
- *
- * @param fd file descriptor of the port
- * @return string representation of configuration, NULL on error
- */
-const char * sSerialAttrStr (int fd);
-
-/**
  * Returns string corresponding to a flow control value
  */
 const char * sSerialFlowToStr (eSerialFlow eFlow);

@@ -123,6 +123,52 @@ static void test_sSerialParityToStr(void) {
 }
 
 /* -------------------------------------------------------------------------- */
+/*                        sSerialAttrToStr tests                              */
+/* -------------------------------------------------------------------------- */
+static void test_sSerialAttrToStr(void) {
+    printf("Testing sSerialAttrToStr...\n");
+
+    xSerialIos ios;
+    const char *result;
+
+    /* Test standard configuration */
+    ios.baud = 9600;
+    ios.dbits = SERIAL_DATABIT_8;
+    ios.parity = SERIAL_PARITY_NONE;
+    ios.sbits = SERIAL_STOPBIT_ONE;
+    ios.flow = SERIAL_FLOW_NONE;
+
+    /* Format: %10ld-%1d%c%1d%c */
+    /* "      9600-8N1 " */
+    /* 9600 (4 digits) -> 6 spaces padding + 9600 */
+    result = sSerialAttrToStr(&ios);
+    TEST_ASSERT_STR_EQ(result, "      9600-8N1 ", "Standard 9600-8N1");
+
+    /* Test max baud rate (6 digits) */
+    ios.baud = 921600;
+    /* "    921600-8N1 " */
+    result = sSerialAttrToStr(&ios);
+    TEST_ASSERT_STR_EQ(result, "    921600-8N1 ", "Max baud 921600-8N1");
+
+    /* Test large baud rate (10 digits - fits) */
+    ios.baud = 1234567890;
+    /* "1234567890-8N1 " */
+    result = sSerialAttrToStr(&ios);
+    TEST_ASSERT_STR_EQ(result, "1234567890-8N1 ", "10-digit baud");
+
+    /* Test various other params */
+    ios.baud = 19200;
+    ios.dbits = SERIAL_DATABIT_7;
+    ios.parity = SERIAL_PARITY_EVEN;
+    ios.sbits = SERIAL_STOPBIT_TWO;
+    ios.flow = SERIAL_FLOW_RTSCTS; /* 'H' */
+
+    /* "     19200-7E2H" */
+    result = sSerialAttrToStr(&ios);
+    TEST_ASSERT_STR_EQ(result, "     19200-7E2H", "19200-7E2H");
+}
+
+/* -------------------------------------------------------------------------- */
 /*                              Main entry point                              */
 /* -------------------------------------------------------------------------- */
 int main(void) {
@@ -132,6 +178,7 @@ int main(void) {
     test_sSerialDataBitsToStr();
     test_sSerialStopBitsToStr();
     test_sSerialParityToStr();
+    test_sSerialAttrToStr();
 
     printf("\n=== Test Summary ===\n");
     printf("Tests run: %d\n", g_tests_run);
